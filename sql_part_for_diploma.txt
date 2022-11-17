@@ -1,0 +1,48 @@
+### Условие проекта
+
+В компании СкайТрэвел планируется маркетинговая акция, направленная на вовлечение пользователей, увеличение активности юзеров из Германии и Австрии. Хочется не только нарастить базу активных пользователей, но и увеличить количество покупок, которые приходятся на одного пользователя. Акция будет действовать в апреле 2022 года.
+
+**Суть акции:**
+
+- Каждый пользователь получает гарантированный приз - баллы лояльности - при достижении 10 покупок в месяц стоимостью больше 3000 рублей (отношение баллов лояльности к рублям - 1 к 1)
+- Случайный участник акции получит гарантированный приз - билеты в Дубай стоимостью в 50000
+
+Маркетинг просит посчитать число пользователей, которых мы сможем потенциально охватить этой акцией, а также смоделировать пессимистичные варианты развития событий:
+
+- Какой максимальный процент баллов лояльности мы можем дать пользователям на этих рынках при описанных условиях гарантированного приза, оставаясь при этом в рамках прибыльности?
+- Какие максимальные потери мы понесём при таких условиях акции?
+- Сколько пользователей следует привлечь, чтобы покрыть все расходы на акцию и получить прибыль?
+
+Также маркетинг просит сделать дешборд, в котором можно было бы наблюдать за ходом акции в режиме реального времени, чтобы понимать, соответствует ли наша модель реальности.
+
+> **Описание метрик компании с формулами:**
+> 
+> - Operating Profit = Revenue - Costs
+>     - Revenue = Users (?) * Purchases per user (10) * Average Transaction Value (3000) * Margin (Base)
+>         - Margin = Commission (Base) / Transaction Value (Base)
+>     - Costs = Fixed costs (Base) + Marketing costs
+>         - Marketing costs = Loyalty costs (?) + Promo costs (50000)
+> 
+> ***Примечание:** Знак (?) рядом с метрикой означает, что её необходимо рассчитать в модели. Пометка (Base) означает, что метрику необходимо вывести на основе имеющихся данных в базе*
+> 
+> *Чтобы построить модель - нужно взять данные за прошлый период, то есть 2021 год.*
+>
+
+Код в sql, напианный для дальнейшего составления юнит-экономики в excel:
+
+with interested_trans as
+     (select user_id,id, coalesce (transaction_value,0) transaction_value, coalesce (commission,0) commission, coalesce (processing_cost,0) processing_cost, coalesce (promocode_cost,0) promocode_cost, coalesce (intergtation_cost,0) intergtation_cost, created_date
+      from orders_exam
+      where created_date between '2021-04-01 00:00'and '2021-04-30 23:59'
+    ),
+    interested_users as
+      (select u.ID user_id
+      from users_exam u 
+      join region_exam r on u.region_id = r.ID
+      where r.language = 'de'
+    )
+    
+select sum(commission) commission_total, sum (transaction_value) total_value, (sum(commission)::float)/sum (transaction_value) margin_base, sum(processing_cost)+sum(intergtation_cost) fixed_cost_month_base, sum(promocode_cost) marketing_cost,
+        avg(transaction_value) avg_trans_value, (count(id)::float)/(count(distinct(iu.user_id))) purchases_per_user, count(distinct(iu.user_id)) users
+
+from interested_trans it join interested_users iu on iu.user_id = it.user_id
